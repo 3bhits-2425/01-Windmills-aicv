@@ -9,7 +9,7 @@ public class WindmillGameManager : MonoBehaviour
     private List<Slider> windmillSliders = new List<Slider>();
     private List<Button> lockButtons = new List<Button>();
 
-    [SerializeField] private Renderer colorTarget;
+    [SerializeField] private GameObject colorTarget;
 
     private List<float> windmillSpeeds = new List<float>();
     private int currentWindmillIndex = 0;
@@ -27,7 +27,6 @@ public class WindmillGameManager : MonoBehaviour
             rotorHubs.Add(windmill.transform.Find("RotorHub").gameObject);
             windmillSliders.Add(windmill.GetComponentInChildren<Slider>());
             lockButtons.Add(windmill.GetComponentInChildren<Button>());
-            Debug.Log("Object found");
         }
         Debug.Log(windmillObjects.Length);
 
@@ -47,43 +46,14 @@ public class WindmillGameManager : MonoBehaviour
 
     private void Update()
     {
-        if (!allLocked && currentWindmillIndex < windmills.Count)
-        {
-            if (!isLocked[currentWindmillIndex])
-            {
-                if (Input.GetKey(KeyCode.Space))
-                {
-                    IncreaseWindmillValue(Time.deltaTime);
-                }
-                else
-                {
-                    DecreaseWindmillValue(Time.deltaTime);
-                }
-            }
-        }
-        RotateWindmills();
+        
     }
 
     private void EnableCurrentWindmill()
     {
-        for (int i = 0;i < rotorHubs.Count; i++)
+        for (int i = 0; i < currentWindmillIndex; i++)
         {
             rotorHubs[i].SetActive(enabled);
-        }
-    }
-
-    private void IncreaseWindmillValue(float deltaTime)
-    {
-        windmillSpeeds[currentWindmillIndex] = Mathf.Clamp(windmillSpeeds[currentWindmillIndex] + (deltaTime * 100f), 0, maxRotationSpeed);
-        windmillSliders[currentWindmillIndex].value = windmillSpeeds[currentWindmillIndex];
-    }
-
-    private void DecreaseWindmillValue(float deltaTime)
-    {
-        if (!isLocked[currentWindmillIndex])
-        {
-            windmillSpeeds[currentWindmillIndex] = Mathf.Clamp(windmillSpeeds[currentWindmillIndex] - (deltaTime * decreaseRate), 0, maxRotationSpeed);
-            windmillSliders[currentWindmillIndex].value = windmillSpeeds[currentWindmillIndex];
         }
     }
 
