@@ -1,29 +1,53 @@
 using UnityEngine;
 using UnityEngine.UI;
+using System.Collections.Generic;
 
 public class WindmillGameManager : MonoBehaviour
 {
-    [SerializeField] private GameObject[] windmills; 
-    [SerializeField] private Slider[] windmillSliders; 
-    [SerializeField] private Button lockButton; 
-    [SerializeField] private Button applyColorButton; 
-    [SerializeField] private GameObject colorTarget; 
+    private List<GameObject> windmills = new List<GameObject>();
+    private List<GameObject> rotorHubs = new List<GameObject>();
+    private List<Slider> windmillSliders = new List<Slider>();
+    private List<Button> lockButtons = new List<Button>();
+
+    [SerializeField] private Renderer colorTarget;
+
+    private List<float> windmillSpeeds = new List<float>();
     private int currentWindmillIndex = 0;
-    private float[] windmillSpeeds = new float[3]; 
-    private bool[] isLocked = new bool[3];
+    private bool[] isLocked;
     private bool allLocked = false;
     private float maxRotationSpeed = 255f;
-    private float decreaseRate = 100f; 
+    private float decreaseRate = 100f;
 
     private void Start()
     {
-        lockButton.onClick.AddListener(LockCurrentWindmill);
-        applyColorButton.onClick.AddListener(ApplyColor);
+        // Find all windmills, sliders, and lock buttons in the scene
+        GameObject[] windmillObjects = GameObject.FindGameObjectsWithTag("Windmill");
+        foreach (GameObject windmill in windmillObjects)
+        {
+            rotorHubs.Add(windmill.transform.Find("RotorHub").gameObject);
+            windmillSliders.Add(windmill.GetComponentInChildren<Slider>());
+            lockButtons.Add(windmill.GetComponentInChildren<Button>());
+            Debug.Log("Object found");
+        }
+        Debug.Log(windmillObjects.Length);
+
+        // Initialize windmill speeds and locked status
+        windmillSpeeds = new List<float>(new float[windmills.Count]);
+        isLocked = new bool[windmills.Count];
+
+        // Set up lock button listeners
+        for (int i = 0; i < lockButtons.Count; i++)
+        {
+            int index = i; // Capture the index for the closure
+            lockButtons[i].onClick.AddListener(() => LockAndApplyCurrentWindmill(index));
+        }
+        EnableCurrentWindmill();
     }
+
 
     private void Update()
     {
-        if (!allLocked && currentWindmillIndex < windmills.Length)
+        if (!allLocked && currentWindmillIndex < windmills.Count)
         {
             if (!isLocked[currentWindmillIndex])
             {
@@ -40,40 +64,44 @@ public class WindmillGameManager : MonoBehaviour
         RotateWindmills();
     }
 
+    private void EnableCurrentWindmill()
+    {
+        for (int i = 0;i < rotorHubs.Count; i++)
+        {
+            rotorHubs[i].SetActive(enabled);
+        }
+    }
+
     private void IncreaseWindmillValue(float deltaTime)
     {
-        float newValue = Mathf.Clamp(windmillSpeeds[currentWindmillIndex] + (deltaTime * 100f), 0, maxRotationSpeed);
-        windmillSpeeds[currentWindmillIndex] = newValue;
-        windmillSliders[currentWindmillIndex].value = newValue;
+        windmillSpeeds[currentWindmillIndex] = Mathf.Clamp(windmillSpeeds[currentWindmillIndex] + (deltaTime * 100f), 0, maxRotationSpeed);
+        windmillSliders[currentWindmillIndex].value = windmillSpeeds[currentWindmillIndex];
     }
 
     private void DecreaseWindmillValue(float deltaTime)
     {
         if (!isLocked[currentWindmillIndex])
         {
-            float newValue = Mathf.Clamp(windmillSpeeds[currentWindmillIndex] - (deltaTime * decreaseRate), 0, maxRotationSpeed);
-            windmillSpeeds[currentWindmillIndex] = newValue;
-            windmillSliders[currentWindmillIndex].value = newValue;
+            windmillSpeeds[currentWindmillIndex] = Mathf.Clamp(windmillSpeeds[currentWindmillIndex] - (deltaTime * decreaseRate), 0, maxRotationSpeed);
+            windmillSliders[currentWindmillIndex].value = windmillSpeeds[currentWindmillIndex];
         }
     }
 
     private void RotateWindmills()
     {
-        for (int i = 0; i < windmills.Length; i++)
+        for (int i = 0; i < windmills.Count; i++)
         {
-            float speed = windmillSpeeds[i];
-            windmills[i].transform.Rotate(0, 0, speed * Time.deltaTime);
+            windmills[i].transform.Rotate(0, 0, windmillSpeeds[i] * Time.deltaTime);
         }
     }
 
-    public void LockCurrentWindmill()
+    private void LockAndApplyCurrentWindmill(int index)
     {
-        if (currentWindmillIndex < windmills.Length && !isLocked[currentWindmillIndex])
+        if (index < windmills.Count && !isLocked[index])
         {
-            isLocked[currentWindmillIndex] = true;
-            
-            
-            if (currentWindmillIndex < windmills.Length - 1)
+            isLocked[index] = true;
+
+            if (index < windmills.Count - 1)
             {
                 currentWindmillIndex++;
             }
@@ -81,15 +109,17 @@ public class WindmillGameManager : MonoBehaviour
             {
                 allLocked = true;
             }
+            ApplyColor();
         }
     }
 
-    public void ApplyColor()
+    private void ApplyColor()
     {
-        if (allLocked)
-        {
-            Color newColor = new Color(windmillSpeeds[0] / 255f, windmillSpeeds[1] / 255f, windmillSpeeds[2] / 255f);
-            colorTarget.GetComponent<Renderer>().material.color = newColor;
-        }
+        float r = windmillSpeeds.Count > 0 ? windmillSpeeds[0] / maxRotationSpeed : 0;
+        float g = windmillSpeeds.Count > 1 ? windmillSpeeds[1] / maxRotationSpeed : 0;
+        float b = windmillSpeeds.Count > 2 ? windmillSpeeds[2] / maxRotationSpeed : 0;
+
+        Color newColor = new Color(r, g, b);
+        colorTarget.GetComponent<Renderer>().material.color = newColor;
     }
 }
