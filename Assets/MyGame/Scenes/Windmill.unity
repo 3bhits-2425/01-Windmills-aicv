@@ -2000,7 +2000,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1579448354}
   m_Layer: 0
-  m_Name: Windmill-DynamicRotation
+  m_Name: WindmillRed
   m_TagString: Windmill
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -2055,7 +2055,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 59ed91336fbf9ac4eb89ec07b83e85ed, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  colorTarget: {fileID: 1402575574}
+  windmills:
+  - {fileID: 1579448353}
+  colorTarget: {fileID: 1402575572}
 --- !u!4 &1634810487
 Transform:
   m_ObjectHideFlags: 0
@@ -2426,6 +2428,7 @@ MonoBehaviour:
   maxRotationSpeed: 300
   acceleration: 50
   deceleration: 30
+  windmillRotationScript: {fileID: 0}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

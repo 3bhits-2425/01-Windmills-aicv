@@ -2,92 +2,153 @@ using UnityEngine;
 using UnityEngine.UI;
 using System.Collections.Generic;
 
-public class WindmillGameManager : MonoBehaviour
+public class WindmillManager : MonoBehaviour
 {
-    private List<GameObject> windmills = new List<GameObject>();
-    private List<GameObject> rotorHubs = new List<GameObject>();
-    private List<Slider> windmillSliders = new List<Slider>();
-    private List<Button> lockButtons = new List<Button>();
-
+    [SerializeField] private List<GameObject> windmills; // Changed from array to List
     [SerializeField] private GameObject colorTarget;
+    private List<Button> lockButtons = new List<Button>();
+    private List<Slider> windmillSliders = new List<Slider>();
+    private List<WindmillDynamicSpeed> windmillScripts = new List<WindmillDynamicSpeed>();
+    private List<bool> locked; // Changed from array to List
+    private int currentIndex = 0;
 
-    private List<float> windmillSpeeds = new List<float>();
-    private int currentWindmillIndex = 0;
-    private bool[] isLocked;
-    private bool allLocked = false;
-    private float maxRotationSpeed = 255f;
-    private float decreaseRate = 100f;
+    private void Awake()
+    {
+        locked = new List<bool>(new bool[windmills.Count]); // Initialize the list with the same size as windmills
+        FindWindmillComponents();
+    }
+
+    private void FindWindmillComponents()
+    {
+        foreach (GameObject windmill in windmills)
+        {
+            WindmillDynamicSpeed windmillScript = windmill.GetComponentInChildren<WindmillDynamicSpeed>();
+            if (windmillScript != null)
+            {
+                windmillScripts.Add(windmillScript);
+            }
+            else
+            {
+                Debug.LogError($"WindmillDynamicSpeed nicht gefunden auf {windmill.name}");
+            }
+
+            Button button = windmill.GetComponentInChildren<Button>();
+            if (button != null)
+            {
+                lockButtons.Add(button);
+                Debug.Log($"Button für {windmill.name} gefunden: {button.name}");
+            }
+            else
+            {
+                Debug.LogError($"Kein Button gefunden in {windmill.name}");
+            }
+
+            Slider slider = windmill.GetComponentInChildren<Slider>();
+            if (slider != null)
+            {
+                windmillSliders.Add(slider);
+                Debug.Log($"Slider für {windmill.name} gefunden: {slider.name}");
+            }
+            else
+            {
+                Debug.LogError($"Kein Slider gefunden in {windmill.name}");
+            }
+        }
+    }
 
     private void Start()
     {
-        // Find all windmills, sliders, and lock buttons in the scene
-        GameObject[] windmillObjects = GameObject.FindGameObjectsWithTag("Windmill");
-        foreach (GameObject windmill in windmillObjects)
+        int minCount = Mathf.Min(lockButtons.Count, windmillSliders.Count, windmillScripts.Count);
+        if (minCount < windmills.Count)
         {
-            rotorHubs.Add(windmill.transform.Find("RotorHub").gameObject);
-            windmillSliders.Add(windmill.GetComponentInChildren<Slider>());
-            lockButtons.Add(windmill.GetComponentInChildren<Button>());
+            Debug.LogError($"Nicht genügend Komponenten gefunden! Windmills: {windmills.Count}, Buttons: {lockButtons.Count}, Sliders: {windmillSliders.Count}, Scripts: {windmillScripts.Count}");
         }
-        Debug.Log(windmillObjects.Length);
 
-        // Initialize windmill speeds and locked status
-        windmillSpeeds = new List<float>(new float[windmills.Count]);
-        isLocked = new bool[windmills.Count];
-
-        // Set up lock button listeners
-        for (int i = 0; i < lockButtons.Count; i++)
+        for (int i = 0; i < minCount; i++)
         {
-            int index = i; // Capture the index for the closure
-            lockButtons[i].onClick.AddListener(() => LockAndApplyCurrentWindmill(index));
+            int index = i;
+            lockButtons[i].onClick.AddListener(delegate { LockWindmill(index); });
+            lockButtons[i].interactable = (i == currentIndex);
+            Debug.Log($"Button {i} registriert - Interactable: {lockButtons[i].interactable}");
+
+            if (windmillSliders[i] != null)
+            {
+                windmillSliders[i].interactable = (i == currentIndex);
+            }
         }
+
         EnableCurrentWindmill();
-    }
-
-
-    private void Update()
-    {
-        
     }
 
     private void EnableCurrentWindmill()
     {
-        for (int i = 0; i < currentWindmillIndex; i++)
+        for (int i = 0; i < windmillScripts.Count; i++)
         {
-            rotorHubs[i].SetActive(enabled);
+            windmillScripts[i].enabled = (i == currentIndex);
         }
+
+        Debug.Log($"Windmühle {currentIndex} aktiviert.");
     }
 
-    private void RotateWindmills()
+    private void LockWindmill(int index)
     {
-        for (int i = 0; i < windmills.Count; i++)
+        Debug.Log($"LockWindmill aufgerufen für Index {index}");
+
+        if (index < 0 || index >= locked.Count || index >= windmillSliders.Count || index >= lockButtons.Count || index >= windmillScripts.Count)
         {
-            windmills[i].transform.Rotate(0, 0, windmillSpeeds[i] * Time.deltaTime);
+            Debug.LogError($"Index {index} ist außerhalb des gültigen Bereichs.");
+            return;
         }
-    }
 
-    private void LockAndApplyCurrentWindmill(int index)
-    {
-        if (index < windmills.Count && !isLocked[index])
+        if (index == currentIndex && !locked[index])
         {
-            isLocked[index] = true;
+            locked[index] = true;
+            Debug.Log($"Windmühle {index} gesperrt");
+            UpdateColor();
+            lockButtons[index].interactable = false;
 
-            if (index < windmills.Count - 1)
+            // Nach dem Sperren Slider-Wert und Geschwindigkeit einfrieren
+            if (windmillSliders[index] != null)
             {
-                currentWindmillIndex++;
+                windmillSliders[index].interactable = false;
             }
-            else
+
+            // Sperre die Geschwindigkeit der Windmühle
+            windmillScripts[index].LockWindmillSpeed();
+
+            // Synchronisiere die Geschwindigkeit mit dem Rotations-Skript
+            if (windmillScripts[index] != null)
             {
-                allLocked = true;
+                float currentSpeed = windmillScripts[index].GetCurrentSpeed();
+                WindmillRotationConstantSpeed rotationScript = windmills[index].GetComponentInChildren<WindmillRotationConstantSpeed>();
+                if (rotationScript != null)
+                {
+                    rotationScript.SetRotationSpeed(currentSpeed);
+                }
             }
-            ApplyColor();
+
+            currentIndex++;
+            Debug.Log($"Neuer currentIndex: {currentIndex}");
+
+            if (currentIndex < lockButtons.Count)
+            {
+                lockButtons[currentIndex].interactable = true;
+                if (windmillSliders[currentIndex] != null)
+                {
+                    windmillSliders[currentIndex].interactable = true;
+                }
+                Debug.Log($"Button {currentIndex} ist jetzt klickbar.");
+            }
+
+            EnableCurrentWindmill();
         }
     }
 
-    private void ApplyColor()
+    private void UpdateColor()
     {
-        float r = windmillSpeeds.Count > 0 ? windmillSpeeds[0] / maxRotationSpeed : 0;
-        float g = windmillSpeeds.Count > 1 ? windmillSpeeds[1] / maxRotationSpeed : 0;
-        float b = windmillSpeeds.Count > 2 ? windmillSpeeds[2] / maxRotationSpeed : 0;
+        float r = currentIndex >= 0 && currentIndex < windmillScripts.Count ? windmillScripts[0].GetNormalizedSpeed() : 0;
+        float g = currentIndex >= 1 && currentIndex < windmillScripts.Count ? windmillScripts[1].GetNormalizedSpeed() : 0;
+        float b = currentIndex >= 2 && currentIndex < windmillScripts.Count ? windmillScripts[2].GetNormalizedSpeed() : 0;
 
         Color newColor = new Color(r, g, b);
         colorTarget.GetComponent<Renderer>().material.color = newColor;
